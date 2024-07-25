@@ -9,6 +9,7 @@ import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 import org.hibernate.query.NativeQuery;
 
+import javax.persistence.criteria.CriteriaQuery;
 import javax.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,12 +44,10 @@ public class UserDaoHibernateImpl implements UserDao {
     public void dropUsersTable() {
         try(Session session = sessionFactory.openSession();) {
             session.beginTransaction();
-            session.createSQLQuery("DROP TABLE users")
+            session.createSQLQuery("DROP TABLE IF EXISTS users")
                     .executeUpdate();
             session.getTransaction().commit();
             System.out.println("Таблица удалена! Если она была!");
-        }finally {
-            sessionFactory.close();
         }
     }
 
@@ -65,40 +64,36 @@ public class UserDaoHibernateImpl implements UserDao {
 
         }catch (HibernateException e){
             e.printStackTrace();
-        }finally {
-            sessionFactory.close();
         }
 
     }
 
     @Override
     public void removeUserById(long id) {
-        try(Session session = Util.getSessionFactory().openSession();) {
-            session.beginTransaction();
-            NativeQuery nativeQuery = session.createNativeQuery("DELETE FROM users WHERE id = :id");
-            nativeQuery.setParameter("id", id);
-            nativeQuery.executeUpdate();
+        Session session = sessionFactory.openSession();
+        Transaction transaction = session.beginTransaction();
+
+        try {
+            session.delete(session.get(User.class, id));
+            transaction.commit();
         }catch(HibernateException e){
             e.printStackTrace();
+        }finally {
+            session.close();
         }
 
     }
 
     @Override
     public List<User> getAllUsers() {
+        Session session = sessionFactory.openSession();
         try {
-            Session session = Util.getSessionFactory().openSession();
-            session.beginTransaction();
-            List<User> usList = session.createQuery("from User")
-                    .getResultList();
-            for (User u : usList){
-                System.out.println(u);
-            }
-            session.getTransaction().commit();
-        }finally {
-            sessionFactory.close();
+            CriteriaQuery<User> criteriaQuery = session.getCriteriaBuilder().createQuery(User.class);
+            criteriaQuery.from(User.class);
+            return session.createQuery(criteriaQuery).getResultList();
+        } finally {
+            session.close();
         }
-        return null;
     }
 
     @Override
@@ -109,8 +104,6 @@ public class UserDaoHibernateImpl implements UserDao {
                     .executeUpdate();
         }catch (HibernateException e){
             e.printStackTrace();
-        }finally {
-            sessionFactory.close();
         }
     }
 }
